@@ -13,6 +13,7 @@ Create a local `.env` file:
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-supabase-key
+CORS_ORIGINS=*
 ```
 
 The `.env` file is intentionally ignored by Git.
@@ -50,6 +51,19 @@ Route overview:
 ```http
 GET /api/routes_overview
 GET /api/routes_overview?weekday=1
+```
+
+Route start event:
+
+```http
+POST /api/route_start_events
+Content-Type: application/json
+
+{
+  "route_code": "R001",
+  "weekday_index": 1,
+  "started_at": "2026-05-07T12:30:00Z"
+}
 ```
 
 Weekday mapping:

@@ -1,8 +1,11 @@
 import os
+from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from supabase import Client, create_client
 
 
@@ -17,6 +20,33 @@ app = FastAPI(
         "the current data source is Supabase."
     ),
 )
+
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+class RouteStartEventRequest(BaseModel):
+    route_code: str = Field(min_length=1)
+    weekday_index: int = Field(ge=1, le=7)
+    started_at: datetime
+
+
+class RouteStartEventResponse(BaseModel):
+    status: str
+    route_code: str
+    weekday_index: int
+    started_at: datetime
 
 
 def get_supabase_client() -> Client:
@@ -72,6 +102,16 @@ def map_route(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def map_route_start_event(row: dict[str, Any]) -> dict[str, Any]:
+    """Map stored route start data into the public Appari REST schema."""
+    return {
+        "status": "ok",
+        "route_code": row.get("route_code"),
+        "weekday_index": row.get("weekday_index"),
+        "started_at": row.get("started_at"),
+    }
+
+
 @app.get("/")
 def index() -> dict[str, str]:
     """Return a tiny health response for local backend checks."""
@@ -107,3 +147,48 @@ def routes_overview(
         "weekday_index": weekday,
         "routes": routes,
     }
+
+
+@app.post(
+    "/api/route_start_events",
+    response_model=RouteStartEventResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_route_start_event(
+    event: RouteStartEventRequest,
+) -> dict[str, Any]:
+    """Store a route start event sent by the Appari client."""
+    client = get_supabase_client()
+
+    payload = {
+        "route_code": event.route_code,
+        "weekday_index": event.weekday_index,
+        "started_at": event.started_at.isoformat(),
+    }
+
+    try:
+        response = (
+            client.table("route_start_events")
+            .insert(payload)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to store route start event in Supabase: {exc}",
+        ) from exc
+
+    if not response.data:
+        raise HTTPException(
+            status_code=502,
+            detail="Supabase did not return the stored route start event.",
+        )
+
+    first_row = response.data[0]
+    if not isinstance(first_row, dict):
+        raise HTTPException(
+            status_code=502,
+            detail="Supabase returned an unexpected route start event format.",
+        )
+
+    return map_route_start_event(first_row)
