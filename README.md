@@ -53,6 +53,18 @@ GET /api/routes_overview
 GET /api/routes_overview?weekday=1
 ```
 
+Route detail:
+
+```http
+GET /api/routes/R001/details?weekday=1
+GET /api/routes/R001/details?weekday=1&delivery_date=2026-05-07
+```
+
+The route detail endpoint returns delivery-date specific stop and container
+quantities. When `delivery_date` is omitted, the backend uses the current date.
+The cloud sync script refreshes today and tomorrow so container quantities stay
+current without deleting older delivery days.
+
 Route start event:
 
 ```http
