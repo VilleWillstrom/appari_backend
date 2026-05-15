@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -47,6 +47,25 @@ class RouteStartEventResponse(BaseModel):
     route_code: str
     weekday_index: int
     started_at: datetime
+
+
+class DeliveryEventRequest(BaseModel):
+    route_code: str = Field(min_length=1)
+    delivery_date: date
+    customer_number: str = Field(min_length=1)
+    delivered_at: datetime
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class DeliveryEventResponse(BaseModel):
+    status: str
+    route_code: str
+    delivery_date: date
+    customer_number: str
+    delivered_at: datetime
+    latitude: float
+    longitude: float
 
 
 def map_container(row: dict[str, Any]) -> dict[str, Any]:
@@ -163,6 +182,19 @@ def map_route_start_event(row: dict[str, Any]) -> dict[str, Any]:
         "route_code": row.get("route_code"),
         "weekday_index": row.get("weekday_index"),
         "started_at": row.get("started_at"),
+    }
+
+
+def map_delivery_event(row: dict[str, Any]) -> dict[str, Any]:
+    """Map stored delivery confirmation data into the public REST schema."""
+    return {
+        "status": "ok",
+        "route_code": row.get("route_code"),
+        "delivery_date": row.get("delivery_date"),
+        "customer_number": row.get("customer_number"),
+        "delivered_at": row.get("delivered_at"),
+        "latitude": row.get("latitude"),
+        "longitude": row.get("longitude"),
     }
 
 
@@ -298,3 +330,47 @@ def create_route_start_event(
         )
 
     return map_route_start_event(first_row)
+
+
+@app.post(
+    "/api/delivery_events",
+    response_model=DeliveryEventResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_delivery_event(
+    event: DeliveryEventRequest,
+) -> dict[str, Any]:
+    """Store one customer delivery confirmation with captured coordinates."""
+    client = get_supabase_client()
+
+    payload = {
+        "route_code": event.route_code,
+        "delivery_date": event.delivery_date.isoformat(),
+        "customer_number": event.customer_number,
+        "delivered_at": event.delivered_at.isoformat(),
+        "latitude": event.latitude,
+        "longitude": event.longitude,
+    }
+
+    try:
+        response = client.table("delivery_events").insert(payload).execute()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to store delivery event in Supabase: {exc}",
+        ) from exc
+
+    if not response.data:
+        raise HTTPException(
+            status_code=502,
+            detail="Supabase did not return the stored delivery event.",
+        )
+
+    first_row = response.data[0]
+    if not isinstance(first_row, dict):
+        raise HTTPException(
+            status_code=502,
+            detail="Supabase returned an unexpected delivery event format.",
+        )
+
+    return map_delivery_event(first_row)
