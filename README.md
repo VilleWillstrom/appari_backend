@@ -78,6 +78,22 @@ Content-Type: application/json
 }
 ```
 
+Delivery confirmation:
+
+```http
+POST /api/delivery_events
+Content-Type: application/json
+
+{
+  "route_code": "R001",
+  "delivery_date": "2026-05-07",
+  "customer_number": "10001",
+  "delivered_at": "2026-05-07T12:45:00Z",
+  "latitude": 60.9821,
+  "longitude": 25.6612
+}
+```
+
 Weekday mapping:
 
 - `1` = Monday
