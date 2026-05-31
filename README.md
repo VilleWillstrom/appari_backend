@@ -44,7 +44,11 @@ Health check:
 
 ```http
 GET /
+HEAD /
 ```
+
+`HEAD /` returns an empty `200 OK` response for uptime monitors such as
+UptimeRobot.
 
 Route overview:
 
