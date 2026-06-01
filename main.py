@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from supabase import Client, create_client
@@ -31,7 +31,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "HEAD", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -202,6 +202,12 @@ def map_delivery_event(row: dict[str, Any]) -> dict[str, Any]:
 def index() -> dict[str, str]:
     """Return a tiny health response for local backend checks."""
     return {"service": "appari_backend", "status": "ok"}
+
+
+@app.head("/")
+def head_index() -> Response:
+    """Return an empty health response for uptime monitors using HEAD."""
+    return Response(status_code=status.HTTP_200_OK)
 
 
 @app.get("/api/routes_overview")
